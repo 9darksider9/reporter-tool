@@ -4,6 +4,7 @@ A security tool for analyzing suspicious emails and managing analysis results. T
 
 ## Project Structure 
 
+```tree
 reporter-tool/
 ├── webapp/ # Web application
 │ ├── app/ # Flask application
@@ -20,7 +21,7 @@ reporter-tool/
 │ └── analyzer.py # Analysis service entry point
 ├── run.sh # Main run script
 └── setup.py # Project setup script
-
+```
 
 ## Installation
 
