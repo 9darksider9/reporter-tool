@@ -1,0 +1,54 @@
+// Add this to your JavaScript
+document.querySelector('[data-bs-target="#newIntegrationModal"]').addEventListener('click', function() {
+    const form = document.getElementById('integrationForm');
+    
+    // Reset all form fields
+    form.reset();
+    form.removeAttribute('data-integration-id');
+    
+    // Clear each field explicitly
+    form.querySelector('[name="name"]').value = '';
+    form.querySelector('[name="http_method"]').value = '';
+    form.querySelector('[name="base_url"]').value = '';
+    form.querySelector('[name="endpoint"]').value = '';
+    form.querySelector('[name="api_key_name"]').value = '';
+    form.querySelector('[name="api_secret"]').value = '';
+    
+    // Show API Secret field for new integrations
+    const apiSecretField = form.querySelector('[name="api_secret"]');
+    apiSecretField.closest('.mb-3').style.display = 'block';
+    
+    // Update modal title and button
+    document.querySelector('#newIntegrationModal .modal-title').textContent = 'New Integration';
+    document.querySelector('#newIntegrationModal button[type="submit"]').textContent = 'Create Integration';
+});
+
+// Update the edit function
+function editIntegration(integrationId) {
+    fetch(`/api/v1/integrations/${integrationId}`)
+        .then(response => response.json())
+        .then(data => {
+            const form = document.getElementById('integrationForm');
+            form.setAttribute('data-integration-id', integrationId);
+            form.querySelector('[name="name"]').value = data.name;
+            form.querySelector('[name="http_method"]').value = data.http_method;
+            form.querySelector('[name="base_url"]').value = data.base_url;
+            form.querySelector('[name="endpoint"]').value = data.endpoint;
+            form.querySelector('[name="api_key_name"]').value = data.api_key_name;
+            
+            // Hide API Secret field for editing
+            const apiSecretField = form.querySelector('[name="api_secret"]');
+            apiSecretField.closest('.mb-3').style.display = 'none';
+            apiSecretField.value = '';
+            
+            document.querySelector('#newIntegrationModal .modal-title').textContent = 'Edit Integration';
+            document.querySelector('#newIntegrationModal button[type="submit"]').textContent = 'Save Changes';
+            
+            const modal = new bootstrap.Modal(document.getElementById('newIntegrationModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading integration details');
+        });
+} 

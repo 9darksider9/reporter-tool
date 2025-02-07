@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Scanner Configuration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <h2>Scanner Configuration</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Add New Scanner</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                            {% for error in form.name.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.scanner_type.label(class="form-label") }}
+                            {{ form.scanner_type(class="form-control") }}
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.base_url.label(class="form-label") }}
+                            {{ form.base_url(class="form-control") }}
+                            {% for error in form.base_url.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.endpoint.label(class="form-label") }}
+                            {{ form.endpoint(class="form-control") }}
+                            {% for error in form.endpoint.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.http_method.label(class="form-label") }}
+                        {{ form.http_method(class="form-control") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.headers.label(class="form-label") }}
+                        {{ form.headers(class="form-control", rows=4, placeholder='{"Authorization": "Bearer YOUR_API_KEY"}') }}
+                        {% for error in form.headers.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.query_params.label(class="form-label") }}
+                        {{ form.query_params(class="form-control", rows=4, placeholder='{"api_key": "YOUR_API_KEY"}') }}
+                        {% for error in form.query_params.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.body_template.label(class="form-label") }}
+                        {{ form.body_template(class="form-control", rows=4, placeholder='{"url": "{{input}}"}') }}
+                        {% for error in form.body_template.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.response_mapping.label(class="form-label") }}
+                        {{ form.response_mapping(class="form-control", rows=4, placeholder='{"malicious": "data.attributes.malicious"}') }}
+                        {% for error in form.response_mapping.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.enabled(class="form-check-input") }}
+                            {{ form.enabled.label(class="form-check-label") }}
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="mb-0">Configured Scanners</h4>
+            </div>
+            <div class="card-body">
+                {% if scanners %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                                <th>Last Test</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for scanner in scanners %}
+                            <tr>
+                                <td>{{ scanner.name }}</td>
+                                <td>{{ scanner.scanner_type }}</td>
+                                <td>{{ scanner.http_method }}</td>
+                                <td>
+                                    {% if scanner.test_status %}
+                                    <span class="badge bg-success">Working</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Failed</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ scanner.last_test.strftime('%Y-%m-%d %H:%M:%S') if scanner.last_test else 'Never' }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary test-scanner" data-scanner-id="{{ scanner.id }}">
+                                        Test
+                                    </button>
+                                    <button class="btn btn-sm btn-info edit-scanner" data-scanner-id="{{ scanner.id }}">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger delete-scanner" data-scanner-id="{{ scanner.id }}">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No scanners configured yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Scanner Information</h4>
+            </div>
+            <div class="card-body">
+                <h5>Configuration Help</h5>
+                <p>Configure external scanners for URLs and IP addresses.</p>
+                
+                <h6>Fields:</h6>
+                <ul>
+                    <li><strong>Base URL:</strong> The root URL of the API (e.g., https://api.example.com)</li>
+                    <li><strong>Endpoint:</strong> The specific API endpoint (e.g., /v1/scan)</li>
+                    <li><strong>Headers:</strong> API keys and other headers in JSON format</li>
+                    <li><strong>Query Params:</strong> URL parameters in JSON format</li>
+                    <li><strong>Body Template:</strong> Request body template with {{input}} placeholder</li>
+                    <li><strong>Response Mapping:</strong> How to map API response fields to our format</li>
+                </ul>
+
+                <h6>Example Configuration:</h6>
+                <pre><code>Headers:
+{
+  "Authorization": "Bearer api_key_here"
+}
+
+Body Template:
+{
+  "url": "{{input}}",
+  "extended": true
+}
+
+Response Mapping:
+{
+  "malicious": "data.attributes.malicious",
+  "score": "data.attributes.risk_score"
+}</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Test scanner functionality
+    document.querySelectorAll('.test-scanner').forEach(button => {
+        button.addEventListener('click', function() {
+            const scannerId = this.dataset.scannerId;
+            const button = this;
+            button.disabled = true;
+            button.textContent = 'Testing...';
+
+            fetch(`/scanners/${scannerId}/test`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Scanner test successful!');
+                    location.reload();
+                } else {
+                    alert(`Test failed: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                alert('Error testing scanner: ' + error);
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.textContent = 'Test';
+            });
+        });
+    });
+});
+</script>
+{% endblock %} 

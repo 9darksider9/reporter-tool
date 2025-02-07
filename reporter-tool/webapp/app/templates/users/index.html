@@ -1,0 +1,708 @@
+{% extends "base.html" %}
+
+{% block title %}User Management{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>User Management</h2>
+        </div>
+        <div class="col text-end">
+            <button class="btn btn-success" onclick="newUser()">New User</button>
+            {% if current_user.is_admin %}
+            <button class="btn btn-primary" onclick="newSystemApiKey()">New System API Key</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Users</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Roles</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.role_names|join(', ') }}</td>
+                            <td>
+                                <span class="badge {% if user.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ 'Active' if user.is_active else 'Inactive' }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-warning" onclick="editUser({{ user.id }})">Edit</button>
+                                {% if user.has_role('ENGINEER') or user.has_role('ADMIN') %}
+                                <button class="btn btn-sm btn-info" onclick="manageApiKeys({{ user.id }})">API Keys</button>
+                                {% endif %}
+                                {% if user.id != current_user.id %}
+                                <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }})">Delete</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- System API Keys Table -->
+    {% if current_user.is_admin %}
+    <div class="card">
+        <div class="card-header">
+            <h3>System API Keys</h3>
+        </div>
+        <div class="card-body">
+            <div id="system-api-keys-table">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.roles.label(class="form-label") }}
+                        <div class="role-checkboxes">
+                            {% for value, label in form.roles.choices %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="roles" value="{{ value }}" id="role_{{ value }}">
+                                <label class="form-check-label" for="role_{{ value }}">
+                                    {{ label }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Keys Modal -->
+<div class="modal fade" id="apiKeysModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">API Keys</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <button class="btn btn-primary" onclick="generateApiKey()">Generate New API Key</button>
+                </div>
+                <div id="api-keys-table">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New API Key Modal -->
+<div class="modal fade" id="newApiKeyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New API Key</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="apiKeyForm">
+                    <div class="mb-3">
+                        <label for="key_name" class="form-label">Key Name</label>
+                        <input type="text" class="form-control" id="key_name" name="key_name" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveApiKey()">Generate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this new modal for displaying new API keys -->
+<div class="modal fade" id="apiKeyDisplayModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">API Key Created</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Please copy this key now. It will not be shown again.
+                </div>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="newApiKey" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="copyApiKey()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this in the head section or in your CSS file -->
+<style>
+.invalid-feedback {
+    display: block;
+    color: #dc3545;
+    margin-top: 0.25rem;
+    font-size: 0.875em;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+}
+
+.is-invalid:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.role-checkboxes {
+    border: 1px solid #495057;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+}
+
+.form-check {
+    margin-bottom: 0.5rem;
+}
+
+.form-check:last-child {
+    margin-bottom: 0;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Add this at the top of your script block
+const UserRole = {
+    USER: {{ UserRole.USER.value }},
+    ANALYST: {{ UserRole.ANALYST.value }},
+    ENGINEER: {{ UserRole.ENGINEER.value }},
+    ADMIN: {{ UserRole.ADMIN.value }}
+};
+
+let currentUserId = null;
+let isSystemKey = false;
+
+function newUser() {
+    const form = document.getElementById('userForm');
+    form.reset();
+    form.removeAttribute('data-user-id');
+    
+    // Ensure "User" role is checked by default
+    form.querySelectorAll('input[name="roles"]').forEach(checkbox => {
+        checkbox.checked = parseInt(checkbox.value) === UserRole.USER;
+    });
+    
+    document.querySelector('#userModal .modal-title').textContent = 'New User';
+    const modal = new bootstrap.Modal(document.getElementById('userModal'));
+    modal.show();
+}
+
+function editUser(userId) {
+    fetch(`/users/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+            const form = document.getElementById('userForm');
+            form.setAttribute('data-user-id', userId);
+            form.querySelector('[name="username"]').value = user.username;
+            form.querySelector('[name="email"]').value = user.email;
+            
+            // Clear all checkboxes first
+            form.querySelectorAll('input[name="roles"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // Check the appropriate roles
+            const userRoles = user.roles;
+            form.querySelectorAll('input[name="roles"]').forEach(checkbox => {
+                if (userRoles & parseInt(checkbox.value)) {
+                    checkbox.checked = true;
+                }
+            });
+            
+            form.querySelector('[name="password"]').value = '';
+            
+            document.querySelector('#userModal .modal-title').textContent = 'Edit User';
+            const modal = new bootstrap.Modal(document.getElementById('userModal'));
+            modal.show();
+        });
+}
+
+function manageApiKeys(userId) {
+    currentUserId = userId;
+    isSystemKey = false;
+    loadApiKeys();
+    const modal = new bootstrap.Modal(document.getElementById('apiKeysModal'));
+    modal.show();
+}
+
+function newSystemApiKey() {
+    currentUserId = null;
+    isSystemKey = true;
+    const modal = new bootstrap.Modal(document.getElementById('newApiKeyModal'));
+    modal.show();
+}
+
+async function loadApiKeys() {
+    const tableDiv = document.getElementById('api-keys-table');
+    try {
+        const response = await fetch(`/users/${currentUserId}/api-keys`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!response.ok) {
+            if (response.headers.get('content-type')?.includes('text/html')) {
+                throw new Error('Session expired. Please refresh the page.');
+            }
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to load API keys');
+        }
+        
+        const data = await response.json();
+        
+        if (data.api_keys && data.api_keys.length > 0) {
+            tableDiv.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Created</th>
+                            <th>Last Used</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.api_keys.map(key => `
+                            <tr>
+                                <td>${key.key_name}</td>
+                                <td>${new Date(key.created_at).toLocaleString()}</td>
+                                <td>${key.last_used ? new Date(key.last_used).toLocaleString() : 'Never'}</td>
+                                <td>
+                                    <span class="badge ${key.enabled ? 'bg-success' : 'bg-danger'}">
+                                        ${key.enabled ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm ${key.enabled ? 'btn-warning' : 'btn-success'}"
+                                            onclick="toggleApiKey(${key.id})">
+                                        ${key.enabled ? 'Disable' : 'Enable'}
+                                    </button>
+                                    <button class="btn btn-sm btn-danger"
+                                            onclick="deleteApiKey(${key.id})">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            tableDiv.innerHTML = '<div class="alert alert-info">No API keys found</div>';
+        }
+    } catch (error) {
+        console.error('Error loading API keys:', error);
+        tableDiv.innerHTML = `<div class="alert alert-danger">Error loading API keys: ${error.message}</div>`;
+        
+        if (error.message.includes('session expired')) {
+            window.location.reload();
+        }
+    }
+}
+
+async function generateApiKey() {
+    const modal = new bootstrap.Modal(document.getElementById('newApiKeyModal'));
+    modal.show();
+}
+
+async function saveApiKey() {
+    try {
+        const form = document.getElementById('apiKeyForm');
+        const formData = new FormData(form);  // Define formData first
+        const data = Object.fromEntries(formData);
+        
+        const url = isSystemKey ? '/users/system-api-keys' : `/users/${currentUserId}/api-keys`;
+        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(data),
+            credentials: 'same-origin'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to create API key');
+        }
+        
+        const result = await response.json();
+        if (result.key) {
+            // Hide the new key modal
+            bootstrap.Modal.getInstance(document.getElementById('newApiKeyModal')).hide();
+            
+            // Show the key in the display modal
+            document.getElementById('newApiKey').value = result.key;
+            const displayModal = new bootstrap.Modal(document.getElementById('apiKeyDisplayModal'));
+            displayModal.show();
+            
+            // Reload the appropriate table
+            if (isSystemKey) {
+                loadSystemApiKeys();
+            } else {
+                loadApiKeys();
+            }
+        }
+    } catch (error) {
+        console.error('Error creating API key:', error);
+        alert('Error creating API key: ' + error.message);
+    }
+}
+
+async function saveUser() {
+    try {
+        const form = document.getElementById('userForm');
+        const userId = form.getAttribute('data-user-id');
+        const isEdit = !!userId;
+
+        // Clear previous error messages
+        form.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+        form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        // Get all form data
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        delete data.csrf_token;
+
+        // Handle roles specially since it's multiple checkboxes
+        data.roles = Array.from(form.querySelectorAll('input[name="roles"]:checked'))
+            .map(checkbox => parseInt(checkbox.value));
+
+        const url = isEdit ? `/users/${userId}` : '/users/create';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        console.log('Sending data:', data);
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(data),
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            if (response.headers.get('content-type')?.includes('text/html')) {
+                throw new Error('Session expired. Please refresh the page.');
+            }
+            const errorData = await response.json();
+            
+            if (errorData.errors) {
+                // Handle validation errors
+                Object.entries(errorData.errors).forEach(([field, messages]) => {
+                    const input = form.querySelector(`[name="${field}"]`);
+                    if (input) {
+                        input.classList.add('is-invalid');
+                        const feedback = document.createElement('div');
+                        feedback.className = 'invalid-feedback';
+                        feedback.textContent = Array.isArray(messages) ? messages.join(', ') : messages;
+                        input.parentNode.appendChild(feedback);
+                    }
+                });
+                throw new Error('Please correct the validation errors');
+            }
+            
+            throw new Error(errorData.message || errorData.error || 'Failed to save user');
+        }
+
+        window.location.reload();
+    } catch (error) {
+        console.error('Error saving user:', error);
+        if (!error.message.includes('validation errors')) {
+            alert('Error saving user: ' + error.message);
+        }
+        
+        if (error.message.includes('session expired')) {
+            window.location.reload();
+        }
+    }
+}
+
+async function deleteUser(userId) {
+    if (!confirm('Are you sure you want to delete this user?')) {
+        return;
+    }
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const response = await fetch(`/users/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            if (response.headers.get('content-type')?.includes('text/html')) {
+                throw new Error('Session expired. Please refresh the page.');
+            }
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to delete user');
+        }
+
+        window.location.reload();
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Error deleting user: ' + error.message);
+        
+        if (error.message.includes('session expired')) {
+            window.location.reload();
+        }
+    }
+}
+
+async function toggleApiKey(keyId) {
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const response = await fetch(`/users/api-keys/${keyId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to toggle API key');
+        }
+
+        // Reload the appropriate table
+        if (isSystemKey) {
+            loadSystemApiKeys();
+        } else {
+            loadApiKeys();
+        }
+    } catch (error) {
+        console.error('Error toggling API key:', error);
+        alert('Error toggling API key: ' + error.message);
+    }
+}
+
+async function deleteApiKey(keyId) {
+    if (!confirm('Are you sure you want to delete this API key?')) {
+        return;
+    }
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const response = await fetch(`/users/api-keys/${keyId}`, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            if (response.headers.get('content-type')?.includes('text/html')) {
+                throw new Error('Session expired. Please refresh the page.');
+            }
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete API key');
+        }
+
+        // Reload the appropriate table
+        if (isSystemKey) {
+            loadSystemApiKeys();
+        } else {
+            loadApiKeys();
+        }
+    } catch (error) {
+        console.error('Error deleting API key:', error);
+        alert('Error deleting API key: ' + error.message);
+        
+        if (error.message.includes('session expired')) {
+            window.location.reload();
+        }
+    }
+}
+
+// Add function to load system API keys
+async function loadSystemApiKeys() {
+    const tableDiv = document.getElementById('system-api-keys-table');
+    try {
+        const response = await fetch('/users/system-api-keys', {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!response.ok) {
+            if (response.headers.get('content-type')?.includes('text/html')) {
+                throw new Error('Session expired. Please refresh the page.');
+            }
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to load system API keys');
+        }
+        
+        const data = await response.json();
+        
+        if (data.api_keys && data.api_keys.length > 0) {
+            tableDiv.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Created</th>
+                            <th>Last Used</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.api_keys.map(key => `
+                            <tr>
+                                <td>${key.key_name}</td>
+                                <td>${new Date(key.created_at).toLocaleString()}</td>
+                                <td>${key.last_used ? new Date(key.last_used).toLocaleString() : 'Never'}</td>
+                                <td>
+                                    <span class="badge ${key.enabled ? 'bg-success' : 'bg-danger'}">
+                                        ${key.enabled ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm ${key.enabled ? 'btn-warning' : 'btn-success'}"
+                                            onclick="toggleApiKey(${key.id})">
+                                        ${key.enabled ? 'Disable' : 'Enable'}
+                                    </button>
+                                    <button class="btn btn-sm btn-danger"
+                                            onclick="deleteApiKey(${key.id})">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            tableDiv.innerHTML = '<div class="alert alert-info">No system API keys found</div>';
+        }
+    } catch (error) {
+        console.error('Error loading system API keys:', error);
+        tableDiv.innerHTML = `<div class="alert alert-danger">Error loading system API keys: ${error.message}</div>`;
+        
+        if (error.message.includes('session expired')) {
+            window.location.reload();
+        }
+    }
+}
+
+// Load system API keys when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('system-api-keys-table')) {
+        loadSystemApiKeys();
+    }
+});
+
+// Add this function to copy API key
+function copyApiKey() {
+    const keyInput = document.getElementById('newApiKey');
+    keyInput.select();
+    document.execCommand('copy');
+    
+    // Show feedback
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+    setTimeout(() => {
+        button.innerHTML = originalText;
+    }, 2000);
+}
+</script>
+{% endblock %} 

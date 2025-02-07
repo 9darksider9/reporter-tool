@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <h2>Welcome, {{ current_user.username }}</h2>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Submissions Trend -->
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Submission Trends</h4>
+                <select class="form-select" style="width: auto;" id="trendDays">
+                    <option value="7">Last 7 Days</option>
+                    <option value="30" selected>Last 30 Days</option>
+                    <option value="60">Last 60 Days</option>
+                    <option value="90">Last 90 Days</option>
+                </select>
+            </div>
+            <div class="card-body">
+                <canvas id="submissionTrend" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Malicious vs Non-Malicious -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Malicious vs Non-Malicious</h4>
+            </div>
+            <div class="card-body">
+                <canvas id="maliciousChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cases/Incidents -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Recent Cases/Incidents</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Case #</th>
+                                <th>Incident #</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for case in recent_cases %}
+                            <tr>
+                                <td>{{ case.submission_date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <a href="{{ case.case_url }}" target="_blank" class="text-info">
+                                        {{ case.case_number }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <a href="{{ case.incident_url }}" target="_blank" class="text-info">
+                                        {{ case.incident_number }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-danger">Malicious</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fake data for demonstration
+    const fakeData = {
+        trend_data: {
+            labels: Array.from({length: 30}, (_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - (29 - i));
+                return d.toISOString().split('T')[0];
+            }),
+            values: Array.from({length: 30}, () => Math.floor(Math.random() * 20))
+        },
+        malicious_data: {
+            malicious: 45,
+            non_malicious: 155
+        }
+    };
+
+    // Setup trend line chart
+    const trendCtx = document.getElementById('submissionTrend').getContext('2d');
+    const trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: fakeData.trend_data.labels,
+            datasets: [{
+                label: 'Submissions',
+                data: fakeData.trend_data.values,
+                borderColor: '#0d6efd',
+                tension: 0.1,
+                fill: true,
+                backgroundColor: 'rgba(13, 110, 253, 0.1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                }
+            }
+        }
+    });
+
+    // Setup malicious vs non-malicious chart
+    const maliciousCtx = document.getElementById('maliciousChart').getContext('2d');
+    const maliciousChart = new Chart(maliciousCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Malicious', 'Non-Malicious'],
+            datasets: [{
+                data: [fakeData.malicious_data.malicious, fakeData.malicious_data.non_malicious],
+                backgroundColor: ['#dc3545', '#198754']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Handle date range changes
+    document.getElementById('trendDays').addEventListener('change', function() {
+        // In production, this would fetch real data
+        console.log('Would fetch data for', this.value, 'days');
+    });
+});
+</script>
+{% endblock %} 

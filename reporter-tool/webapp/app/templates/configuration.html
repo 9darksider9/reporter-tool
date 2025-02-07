@@ -1,0 +1,704 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <h2>Configuration</h2>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Storage Configuration Display -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Storage Configuration for Malicious Artifacts</h4>
+                <button class="btn btn-primary" 
+                        data-bs-toggle="modal" 
+                        data-bs-target="#chooseStorageModal">
+                    Add Storage
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="storage-configs-table">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p>Loading storage configurations...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrations Display -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Integrations</h4>
+                <button class="btn btn-primary" 
+                        data-bs-toggle="modal" 
+                        data-bs-target="#newIntegrationModal">
+                    New Integration
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="integrations-table">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Choose Storage Provider Modal -->
+<div class="modal fade" id="chooseStorageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Storage</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="storage_provider_select" class="form-label">Select Storage Provider</label>
+                    <select class="form-select" id="storage_provider_select" onchange="toggleStorageFields()">
+                        <option value="">Choose a provider...</option>
+                        <option value="aws">AWS S3</option>
+                        <option value="azure">Azure Blob</option>
+                    </select>
+                </div>
+
+                <form method="POST" action="{{ url_for('config_routes.storage') }}" id="storageForm">
+                    {{ storage_form.hidden_tag() }}
+                    <input type="hidden" id="selected_storage_type" name="storage_type" value="">
+
+                    <!-- Configuration Name field - always visible -->
+                    <div class="mb-3">
+                        {{ storage_form.name.label(class="form-label") }}
+                        {{ storage_form.name(class="form-control", placeholder="Enter a name for this configuration") }}
+                    </div>
+
+                    <!-- AWS S3 Fields -->
+                    <div id="aws-fields" style="display: none;">
+                        <div class="mb-3">
+                            {{ storage_form.aws_access_key.label(class="form-label") }}
+                            {{ storage_form.aws_access_key(class="form-control", placeholder="Enter AWS Access Key") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ storage_form.aws_secret_key.label(class="form-label") }}
+                            {{ storage_form.aws_secret_key(class="form-control", placeholder="Enter AWS Secret Key") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ storage_form.aws_bucket_name.label(class="form-label") }}
+                            {{ storage_form.aws_bucket_name(class="form-control", placeholder="Enter S3 Bucket Name") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ storage_form.aws_region.label(class="form-label") }}
+                            {{ storage_form.aws_region(class="form-control", placeholder="e.g., us-east-1") }}
+                        </div>
+                    </div>
+
+                    <!-- Azure Blob Fields -->
+                    <div id="azure-fields" style="display: none;">
+                        <div class="mb-3">
+                            {{ storage_form.azure_connection_string.label(class="form-label") }}
+                            {{ storage_form.azure_connection_string(class="form-control", placeholder="Enter Azure Connection String") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ storage_form.azure_container_name.label(class="form-label") }}
+                            {{ storage_form.azure_container_name(class="form-control", placeholder="Enter Container Name") }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" onclick="testConnection()">Test Connection</button>
+                <button type="submit" form="storageForm" class="btn btn-primary">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Integration Modal -->
+<div class="modal fade" id="newIntegrationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Integration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('config_routes.save_integration') }}" id="integrationForm">
+                    {{ integration_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ integration_form.name.label(class="form-label") }}
+                        {{ integration_form.name(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ integration_form.http_method.label(class="form-label") }}
+                        {{ integration_form.http_method(class="form-select") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ integration_form.base_url.label(class="form-label") }}
+                        {{ integration_form.base_url(class="form-control", placeholder="https://api.example.com") }}
+                        <div class="form-text text-muted">Include the protocol (http:// or https://)</div>
+                    </div>
+                    <div class="mb-3">
+                        {{ integration_form.endpoint.label(class="form-label") }}
+                        {{ integration_form.endpoint(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ integration_form.api_key_name.label(class="form-label") }}
+                        {{ integration_form.api_key_name(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ integration_form.api_secret.label(class="form-label") }}
+                        {{ integration_form.api_secret(class="form-control") }}
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="integrationForm" class="btn btn-primary">Save Integration</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Function to fetch and display configurations
+async function loadConfigurations() {
+    try {
+        const response = await fetch('/api/v1/configurations');
+        const data = await response.json();
+        
+        // Update storage configuration display
+        const storageDisplay = document.getElementById('storage-config-display');
+        if (data.storage.provider) {
+            let details = '';
+            if (data.storage.provider === 'aws') {
+                details = `
+                    <div class="mb-2"><strong>Bucket:</strong> ${data.storage.details.bucket_name}</div>
+                    <div class="mb-2"><strong>Region:</strong> ${data.storage.details.region}</div>
+                `;
+            } else {
+                details = `
+                    <div class="mb-2"><strong>Container:</strong> ${data.storage.details.container_name}</div>
+                `;
+            }
+            
+            storageDisplay.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="mb-2"><strong>Provider:</strong> ${data.storage.provider.toUpperCase()}</div>
+                        ${details}
+                    </div>
+                    <button class="btn btn-primary" onclick="editStorage(${data.storage.id})">
+                        Edit
+                    </button>
+                </div>
+            `;
+        } else {
+            storageDisplay.innerHTML = '<div class="alert alert-info">No storage configured</div>';
+        }
+        
+        // Update integrations table
+        const integrationsTable = document.getElementById('integrations-table');
+        if (data.integrations.length > 0) {
+            integrationsTable.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Base URL</th>
+                            <th>Method</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.integrations.map(integration => `
+                            <tr>
+                                <td>${integration.name}</td>
+                                <td>${integration.base_url}</td>
+                                <td>${integration.http_method}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" 
+                                            onclick="editIntegration(${integration.id})">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" 
+                                            onclick="deleteIntegration(${integration.id})">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            integrationsTable.innerHTML = '<div class="alert alert-info">No integrations configured</div>';
+        }
+    } catch (error) {
+        console.error('Error loading configurations:', error);
+    }
+}
+
+// Load configurations when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfigurations();
+});
+
+// Update form submission to use AJAX
+document.getElementById('storageForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    try {
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+        delete data.csrf_token;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const configId = this.getAttribute('data-config-id');
+        const isEdit = !!configId;
+
+        const url = isEdit 
+            ? `/api/v1/storage-configurations/${configId}`
+            : '/api/v1/storage-configurations';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify(data),
+            credentials: 'same-origin'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to save configuration');
+        }
+
+        const result = await response.json();
+        console.log('Save result:', result);
+        
+        bootstrap.Modal.getInstance(document.getElementById('chooseStorageModal')).hide();
+        await loadStorageConfigurations();
+        alert(isEdit ? 'Configuration updated successfully' : 'Configuration created successfully');
+    } catch (error) {
+        console.error('Error saving configuration:', error);
+        alert('Error saving storage configuration: ' + error.message);
+    }
+});
+
+document.getElementById('integrationForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    try {
+        console.log('Submitting integration form');
+        const formData = new FormData(this);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        
+        // Add CSRF token to formData
+        formData.append('csrf_token', csrfToken);
+
+        const response = await fetch(this.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+        
+        console.log('Response status:', response.status);
+        const contentType = response.headers.get('content-type');
+        console.log('Content type:', contentType);
+        
+        const responseText = await response.text();
+        console.log('Response text:', responseText);
+        
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (e) {
+            console.error('Failed to parse JSON:', e);
+            throw new Error(`Server returned invalid response: ${responseText.substring(0, 100)}`);
+        }
+
+        if (!response.ok) {
+            if (result.errors) {
+                const errorMessages = Object.entries(result.errors)
+                    .map(([field, error]) => `${field}: ${error}`)
+                    .join('\n');
+                throw new Error(`Validation failed:\n${errorMessages}`);
+            }
+            throw new Error(result.message || 'Failed to save integration');
+        }
+
+        console.log('Form submission result:', result);
+        
+        bootstrap.Modal.getInstance(document.getElementById('newIntegrationModal')).hide();
+        await loadIntegrations();
+        alert('Integration saved successfully');
+    } catch (error) {
+        console.error('Error saving integration:', error);
+        alert('Error saving integration: ' + error.message);
+    }
+});
+
+function toggleStorageFields() {
+    const provider = document.querySelector('#storage_provider_select').value;
+    const selectedStorageType = document.querySelector('#selected_storage_type');
+    const awsFields = document.querySelector('#aws-fields');
+    const azureFields = document.querySelector('#azure-fields');
+    
+    if (!provider) {
+        awsFields.style.display = 'none';
+        azureFields.style.display = 'none';
+        return;
+    }
+
+    // Set the hidden storage type input value
+    selectedStorageType.value = provider;
+
+    // Show/hide appropriate fields
+    awsFields.style.display = provider === 'aws' ? 'block' : 'none';
+    azureFields.style.display = provider === 'azure' ? 'block' : 'none';
+}
+
+async function testConnection() {
+    try {
+        const response = await fetch('/api/validate-storage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        alert(data.message);
+    } catch (error) {
+        alert('Error testing connection: ' + error.message);
+    }
+}
+
+// Add this to your existing JavaScript
+async function loadStorageConfigurations() {
+    try {
+        const storageTable = document.getElementById('storage-configs-table');
+        storageTable.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Loading storage configurations...</p>
+            </div>
+        `;
+
+        // Get CSRF token from meta tag
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        const response = await fetch('/api/v1/storage-configurations', {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Storage configurations:', data);
+        
+        if (data.configurations && data.configurations.length > 0) {
+            storageTable.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Storage Provider</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.configurations.map(config => `
+                            <tr>
+                                <td>${config.name}</td>
+                                <td>${config.storage_type.toUpperCase()}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" 
+                                            onclick="editStorageConfig(${JSON.stringify(config).replace(/"/g, '&quot;')})">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" 
+                                            onclick="deleteStorageConfig(${config.id}, '${config.name}')">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            storageTable.innerHTML = '<div class="alert alert-info">No storage configurations found</div>';
+        }
+    } catch (error) {
+        console.error('Error loading storage configurations:', error);
+        document.getElementById('storage-configs-table').innerHTML = 
+            `<div class="alert alert-danger">Error loading storage configurations: ${error.message}</div>`;
+    }
+}
+
+function editStorageConfig(config) {
+    const form = document.getElementById('storageForm');
+    
+    // Set the config ID for editing
+    form.setAttribute('data-config-id', config.id);
+    
+    // Populate the form with existing values
+    document.querySelector('#storage_provider_select').value = config.storage_type;
+    document.querySelector('#selected_storage_type').value = config.storage_type;
+    form.querySelector('input[name="name"]').value = config.name;
+    
+    if (config.storage_type === 'aws') {
+        form.querySelector('#aws_access_key').value = config.credentials.access_key || '';
+        form.querySelector('#aws_secret_key').value = config.credentials.secret_key || '';
+        form.querySelector('#aws_bucket_name').value = config.bucket_name || '';
+        form.querySelector('#aws_region').value = config.credentials.region || '';
+    } else {
+        form.querySelector('#azure_connection_string').value = config.credentials.connection_string || '';
+        form.querySelector('#azure_container_name').value = config.container_name || '';
+    }
+    
+    // Show appropriate fields
+    toggleStorageFields();
+    
+    // Update modal title
+    document.querySelector('#chooseStorageModal .modal-title').textContent = 'Edit Storage Configuration';
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('chooseStorageModal'));
+    modal.show();
+}
+
+// Set up auto-refresh every 300 seconds (5 minutes)
+setInterval(loadStorageConfigurations, 300000);
+
+// Load configurations when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadStorageConfigurations();
+});
+
+async function loadIntegrations() {
+    try {
+        console.log('Starting loadIntegrations');  // Add debug logging
+        const integrationsTable = document.getElementById('integrations-table');
+        integrationsTable.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Loading integrations...</p>
+            </div>
+        `;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        const response = await fetch('/api/v1/integrations', {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+        });
+        
+        console.log('Response status:', response.status);  // Add debug logging
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Response error:', errorData);  // Add error logging
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Integrations data:', data);  // Add debug logging
+        
+        if (data.integrations && data.integrations.length > 0) {
+            integrationsTable.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Base URL</th>
+                            <th>Method</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.integrations.map(integration => `
+                            <tr>
+                                <td>${integration.name}</td>
+                                <td>${integration.base_url}</td>
+                                <td>${integration.http_method}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" 
+                                            onclick="editIntegration(${JSON.stringify(integration).replace(/"/g, '&quot;')})">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" 
+                                            onclick="deleteIntegration(${integration.id})">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } else {
+            integrationsTable.innerHTML = '<div class="alert alert-info">No integrations configured</div>';
+        }
+    } catch (error) {
+        console.error('Error in loadIntegrations:', error);  // Add error logging
+        document.getElementById('integrations-table').innerHTML = 
+            `<div class="alert alert-danger">Error loading integrations: ${error.message}</div>`;
+    }
+}
+
+function editIntegration(integration) {
+    // Populate the form with existing values
+    const form = document.getElementById('integrationForm');
+    form.querySelector('input[name="name"]').value = integration.name;
+    form.querySelector('select[name="http_method"]').value = integration.http_method;
+    form.querySelector('input[name="base_url"]').value = integration.base_url;
+    form.querySelector('input[name="endpoint"]').value = integration.endpoint;
+    form.querySelector('input[name="api_key_name"]').value = integration.api_key_name;
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('newIntegrationModal'));
+    modal.show();
+}
+
+async function deleteIntegration(integrationId) {
+    if (!confirm('Are you sure you want to delete this integration?')) {
+        return;
+    }
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const response = await fetch(`/api/v1/integrations/${integrationId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to delete integration');
+        }
+
+        await loadIntegrations();
+        alert('Integration deleted successfully');
+    } catch (error) {
+        console.error('Error deleting integration:', error);
+        alert('Error deleting integration: ' + error.message);
+    }
+}
+
+// Set up auto-refresh for integrations
+setInterval(loadIntegrations, 300000);
+
+// Load integrations when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadIntegrations();
+});
+
+// Add this function to handle new configuration
+document.querySelector('[data-bs-target="#chooseStorageModal"]').addEventListener('click', function() {
+    const form = document.getElementById('storageForm');
+    
+    // Clear the config ID
+    form.removeAttribute('data-config-id');
+    
+    // Reset all fields
+    form.reset();
+    document.querySelector('#storage_provider_select').value = '';
+    document.querySelector('#selected_storage_type').value = '';
+    
+    // Reset modal title
+    document.querySelector('#chooseStorageModal .modal-title').textContent = 'New Storage Configuration';
+    
+    // Hide all provider-specific fields
+    document.querySelector('#aws-fields').style.display = 'none';
+    document.querySelector('#azure-fields').style.display = 'none';
+});
+
+async function deleteStorageConfig(configId, configName) {
+    if (!confirm(`Are you sure you want to delete storage configuration "${configName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/v1/storage-configurations/${configId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Show success message
+            showAlert('success', 'Storage configuration deleted successfully');
+            // Reload the page to update the list
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert('danger', `Failed to delete storage configuration: ${data.message}`);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('danger', 'An error occurred while deleting the storage configuration');
+    }
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>
+{% endblock %} 

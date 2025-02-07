@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}API Keys{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <h2>API Keys</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Generate New API Key</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.key_name.label(class="form-label") }}
+                        {{ form.key_name(class="form-control") }}
+                    </div>
+                    {{ form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+
+        {% if api_keys %}
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Existing API Keys</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Created</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key in api_keys %}
+                            <tr>
+                                <td>{{ key.key_name }}</td>
+                                <td>{{ key.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>
+                                    {% if key.enabled %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Disabled</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('config_routes.toggle_api_key', key_id=key.id) }}" class="d-inline">
+                                        {{ form.hidden_tag() }}
+                                        <button type="submit" class="btn btn-sm btn-warning">
+                                            {% if key.enabled %}Disable{% else %}Enable{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('config_routes.delete_api_key', key_id=key.id) }}" class="d-inline">
+                                        {{ form.hidden_tag() }}
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this API key?')">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if new_key %}
+        <div class="alert alert-success mt-4">
+            <h5>New API Key Generated</h5>
+            <p>Please save this key now. You won't be able to see it again:</p>
+            <code>{{ new_key }}</code>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

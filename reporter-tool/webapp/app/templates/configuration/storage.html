@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Storage Configuration</h2>
+        </div>
+        <div class="col text-end">
+            <button class="btn btn-primary" onclick="newConfiguration()">New Configuration</button>
+        </div>
+    </div>
+    
+    <div id="configurations-list">
+        <!-- Will be populated by JavaScript -->
+    </div>
+</div>
+
+<!-- Configuration Modal -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Storage Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="storageConfigForm" novalidate onsubmit="return false;" data-api-url="/api/v1/storage-configurations">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.storage_type.label(class="form-label") }}
+                        {{ form.storage_type(class="form-control") }}
+                    </div>
+                    
+                    <div id="aws-fields" style="display: none;">
+                        <div class="mb-3">
+                            {{ form.aws_access_key.label(class="form-label") }}
+                            {{ form.aws_access_key(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.aws_secret_key.label(class="form-label") }}
+                            {{ form.aws_secret_key(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.aws_bucket_name.label(class="form-label") }}
+                            {{ form.aws_bucket_name(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.aws_region.label(class="form-label") }}
+                            {{ form.aws_region(class="form-control") }}
+                        </div>
+                    </div>
+                    
+                    <div id="azure-fields" style="display: none;">
+                        <div class="mb-3">
+                            {{ form.azure_connection_string.label(class="form-label") }}
+                            {{ form.azure_connection_string(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.azure_container_name.label(class="form-label") }}
+                            {{ form.azure_container_name(class="form-control") }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitForm(); return false;">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Error</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage"></p>
+                <div class="alert alert-info" id="errorDetails" style="display: none;">
+                    <pre class="mb-0"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Add this function at the top of your script section
+function showError(message, details = null) {
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    document.getElementById('errorMessage').textContent = message;
+    
+    const detailsElement = document.getElementById('errorDetails');
+    if (details) {
+        detailsElement.style.display = 'block';
+        detailsElement.querySelector('pre').textContent = typeof details === 'object' ? 
+            JSON.stringify(details, null, 2) : details;
+    } else {
+        detailsElement.style.display = 'none';
+    }
+    
+    errorModal.show();
+}
+
+// Add this function to handle form submission
+async function submitForm() {
+    const form = document.getElementById('storageConfigForm');
+    const configId = form.getAttribute('data-config-id');
+    const isEdit = !!configId;
+    const apiUrl = form.getAttribute('data-api-url');
+
+    try {
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        const csrfToken = formData.get('csrf_token');
+        delete data.csrf_token;
+
+        const url = isEdit 
+            ? `${apiUrl}/${configId}`
+            : apiUrl;
+        const method = isEdit ? 'PUT' : 'POST';
+
+        console.group('Request Details');
+        console.log('URL:', url);
+        console.log('Method:', method);
+        console.log('Data:', data);
+        console.log('CSRF Token:', csrfToken);
+        console.groupEnd();
+
+        const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        };
+
+        if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+        }
+
+        console.log('Request Headers:', headers);
+
+        const response = await fetch(url, {
+            method: method,
+            headers: headers,
+            body: JSON.stringify(data),
+            credentials: 'same-origin'
+        });
+
+        console.group('Response Details');
+        console.log('Status:', response.status);
+        console.log('Status Text:', response.statusText);
+        console.log('Headers:', Object.fromEntries([...response.headers]));
+        console.groupEnd();
+
+        const contentType = response.headers.get('content-type');
+        console.log('Content-Type:', contentType);
+
+        const rawText = await response.text();
+        console.log('Raw Response:', rawText);
+
+        if (rawText.trim().toLowerCase().startsWith('<!doctype html')) {
+            console.error('Received HTML response');
+            if (rawText.includes('login')) {
+                showError('Your session has expired. Please refresh the page to log in again.', {
+                    responseType: 'HTML',
+                    status: response.status,
+                    url: url
+                });
+                return;
+            }
+            throw new Error('Server returned HTML instead of JSON');
+        }
+
+        let responseData;
+        try {
+            responseData = JSON.parse(rawText);
+            console.log('Parsed Response:', responseData);
+        } catch (e) {
+            console.error('JSON Parse Error:', e);
+            showError('Failed to parse server response', {
+                error: e.message,
+                rawResponse: rawText.substring(0, 500),
+                status: response.status,
+                url: url
+            });
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(responseData.message || 'Failed to save configuration');
+        }
+
+        // Success! Close modal and reload
+        const modal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
+        modal.hide();
+        
+        // Show success message before reloading
+        alert(isEdit ? 'Configuration updated successfully' : 'Configuration created successfully');
+        window.location.reload();
+
+    } catch (error) {
+        console.error('Error saving storage configuration:', error);
+        showError(
+            'Error saving storage configuration', 
+            {
+                message: error.message,
+                type: error.name,
+                url: url,
+                method: method,
+                stack: error.stack
+            }
+        );
+    }
+}
+
+function newConfiguration() {
+    const form = document.getElementById('storageConfigForm');
+    
+    // Reset all form fields
+    form.reset();
+    form.removeAttribute('data-config-id');
+    
+    // Clear each field explicitly
+    form.querySelector('[name="name"]').value = '';
+    form.querySelector('[name="storage_type"]').value = '';
+    form.querySelector('[name="aws_access_key"]').value = '';
+    form.querySelector('[name="aws_secret_key"]').value = '';
+    form.querySelector('[name="aws_bucket_name"]').value = '';
+    form.querySelector('[name="aws_region"]').value = '';
+    form.querySelector('[name="azure_connection_string"]').value = '';
+    form.querySelector('[name="azure_container_name"]').value = '';
+    
+    // Update modal title and button
+    document.querySelector('#configModal .modal-title').textContent = 'New Storage Configuration';
+    document.querySelector('#configModal button[type="submit"]').textContent = 'Create Configuration';
+    
+    // Update field visibility
+    updateFieldVisibility();
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('configModal'));
+    modal.show();
+}
+
+function editConfiguration(configId) {
+    console.log('Editing configuration:', configId);
+    fetch(`/api/v1/storage-configurations/${configId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Configuration data:', data);
+            const form = document.getElementById('storageConfigForm');
+            form.setAttribute('data-config-id', configId);
+            form.querySelector('[name="name"]').value = data.name;
+            form.querySelector('[name="storage_type"]').value = data.storage_type;
+            
+            if (data.storage_type === 'aws') {
+                form.querySelector('[name="aws_access_key"]').value = data.credentials?.access_key || '';
+                form.querySelector('[name="aws_secret_key"]').value = data.credentials?.secret_key || '';
+                form.querySelector('[name="aws_region"]').value = data.credentials?.region || '';
+                form.querySelector('[name="aws_bucket_name"]').value = data.bucket_name || '';
+            } else {
+                form.querySelector('[name="azure_connection_string"]').value = data.credentials?.connection_string || '';
+                form.querySelector('[name="azure_container_name"]').value = data.container_name || '';
+            }
+            
+            updateFieldVisibility();
+            document.querySelector('#configModal .modal-title').textContent = 'Edit Storage Configuration';
+            document.querySelector('#configModal button[type="submit"]').textContent = 'Save Changes';
+            
+            const modal = new bootstrap.Modal(document.getElementById('configModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error loading configuration:', error);
+            showError('Error loading configuration details', error.message);
+        });
+}
+
+// Show/hide fields based on storage type
+function updateFieldVisibility() {
+    const storageType = document.getElementById('storage_type').value;
+    document.getElementById('aws-fields').style.display = storageType === 'aws' ? 'block' : 'none';
+    document.getElementById('azure-fields').style.display = storageType === 'azure' ? 'block' : 'none';
+}
+
+// Initial field visibility
+document.addEventListener('DOMContentLoaded', updateFieldVisibility);
+
+// Update fields when storage type changes
+document.getElementById('storage_type').addEventListener('change', updateFieldVisibility);
+</script>
+{% endblock %} 

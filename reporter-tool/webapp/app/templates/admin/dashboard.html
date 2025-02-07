@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Admin Dashboard</h2>
+    
+    <!-- Log Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Audit Logs</h5>
+                </div>
+                <div class="card-body" id="audit-stats">
+                    <p class="text-muted mb-0">Loading...</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Authentication Logs</h5>
+                </div>
+                <div class="card-body" id="authentication-stats">
+                    <p class="text-muted mb-0">Loading...</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Usage Logs</h5>
+                </div>
+                <div class="card-body" id="usage-stats">
+                    <p class="text-muted mb-0">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Viewer -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">Log Viewer</h3>
+                <div>
+                    <select class="form-select" id="logType">
+                        <option value="audit">Audit Logs</option>
+                        <option value="authentication">Authentication Logs</option>
+                        <option value="usage">Usage Logs</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Start Date</label>
+                        <input type="datetime-local" class="form-control" id="startDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">End Date</label>
+                        <input type="datetime-local" class="form-control" id="endDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary d-block" onclick="loadLogs()">Load Logs</button>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table" id="logTable">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Actor</th>
+                            <th>Action</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logging Configuration -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">Logging Configuration</h3>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#siemConfigModal">
+                    Configure SIEM
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- Log Types -->
+                <div class="col-md-6 mb-4">
+                    <h5>Log Types</h5>
+                    <ul class="list-group">
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Audit Logs</strong>
+                                    <p class="mb-0 text-muted small">User actions, system changes, and security events</p>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Authentication Logs</strong>
+                                    <p class="mb-0 text-muted small">Login attempts, API key usage, and authentication events</p>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Usage Logs</strong>
+                                    <p class="mb-0 text-muted small">Feature usage and user activity tracking</p>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Application Logs</strong>
+                                    <p class="mb-0 text-muted small">System operations, errors, and debug information</p>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- SIEM Integration Status -->
+                <div class="col-md-6 mb-4">
+                    <h5>SIEM Integration</h5>
+                    <div id="siemStatus">
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No SIEM integration configured
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Local Log Settings -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h5>Local Log Settings</h5>
+                    <ul class="list-unstyled">
+                        <li><strong>Log Location:</strong> <code>webapp/app/logs/</code></li>
+                        <li><strong>Format:</strong> JSON with timestamp prefix</li>
+                        <li><strong>Timezone:</strong> UTC</li>
+                        <li><strong>Rotation:</strong> 10MB max file size, 10 backup files</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIEM Configuration Modal -->
+    <div class="modal fade" id="siemConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">SIEM Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="siemConfigForm">
+                        <div class="mb-3">
+                            <label class="form-label">SIEM Type</label>
+                            <select class="form-select" id="siemType" onchange="toggleSiemFields()">
+                                <option value="">Select SIEM Type...</option>
+                                <option value="splunk">Splunk</option>
+                                <option value="elastic">Elasticsearch</option>
+                                <option value="qradar">QRadar</option>
+                            </select>
+                        </div>
+
+                        <!-- Splunk Fields -->
+                        <div id="splunkFields" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">HEC URL</label>
+                                <input type="url" class="form-control" id="splunkUrl" placeholder="https://splunk-server:8088">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">HEC Token</label>
+                                <input type="password" class="form-control" id="splunkToken">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Index</label>
+                                <input type="text" class="form-control" id="splunkIndex">
+                            </div>
+                        </div>
+
+                        <!-- Elasticsearch Fields -->
+                        <div id="elasticFields" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">Elasticsearch URL</label>
+                                <input type="url" class="form-control" id="elasticUrl" placeholder="https://elasticsearch-server:9200">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">API Key</label>
+                                <input type="password" class="form-control" id="elasticApiKey">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Index Pattern</label>
+                                <input type="text" class="form-control" id="elasticIndex" placeholder="reporter-logs-*">
+                            </div>
+                        </div>
+
+                        <!-- QRadar Fields -->
+                        <div id="qradarFields" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">QRadar URL</label>
+                                <input type="url" class="form-control" id="qradarUrl">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Authentication Token</label>
+                                <input type="password" class="form-control" id="qradarToken">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" onclick="testSiemConnection()">Test Connection</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSiemConfig()">Save Configuration</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- UTC Disclaimer -->
+    <div class="text-muted text-center mt-3">
+        <small>All times are displayed in UTC</small>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadLogStats() {
+    try {
+        console.log('[DEBUG] Loading log statistics...');
+        const response = await fetch('/api/logs/stats');
+        console.log('[DEBUG] Response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load log statistics');
+        }
+        
+        const stats = await response.json();
+        console.log('[DEBUG] Received stats:', stats);
+        
+        for (const [logType, data] of Object.entries(stats)) {
+            const element = document.getElementById(`${logType}-stats`);
+            if (!element) {
+                console.error(`[ERROR] Element not found for ${logType}-stats`);
+                continue;
+            }
+            
+            if (!data || data.entry_count === 0) {
+                element.innerHTML = '<p class="text-muted mb-0">No logs available</p>';
+            } else {
+                element.innerHTML = `
+                    <p class="mb-2"><strong>Entries:</strong> ${data.entry_count}</p>
+                    <p class="mb-2"><strong>Size:</strong> ${formatBytes(data.size)}</p>
+                    <p class="mb-0"><strong>Last Modified:</strong> ${formatDate(data.last_modified)}</p>
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('[ERROR] Error in loadLogStats:', error);
+        for (const logType of ['audit', 'authentication', 'usage']) {
+            const element = document.getElementById(`${logType}-stats`);
+            if (element) {
+                element.innerHTML = '<p class="text-danger mb-0">Error loading statistics</p>';
+            }
+        }
+    }
+}
+
+async function loadLogs() {
+    const tbody = document.querySelector('#logTable tbody');
+    if (!tbody) {
+        console.error('[ERROR] Log table body not found');
+        return;
+    }
+
+    const loadingRow = `
+        <tr>
+            <td colspan="5" class="text-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </td>
+        </tr>
+    `;
+    tbody.innerHTML = loadingRow;
+
+    try {
+        const logType = document.getElementById('logType').value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        
+        console.log('[DEBUG] Loading logs with params:', { logType, startDate, endDate });
+        
+        const params = new URLSearchParams();
+        if (startDate) params.append('start_time', startDate + 'Z');
+        if (endDate) params.append('end_time', endDate + 'Z');
+        
+        const url = `/api/logs/${logType}?${params}`;
+        console.log('[DEBUG] Fetching logs from:', url);
+        
+        const response = await fetch(url);
+        console.log('[DEBUG] Response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[ERROR] Server response:', errorText);
+            throw new Error(`Failed to load logs: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('[DEBUG] Received log data:', data);
+        
+        if (!data.logs || data.logs.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center text-muted">
+                        No logs found for the selected period
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = data.logs.map(log => `
+            <tr>
+                <td>${formatDate(log.timestamp)}</td>
+                <td>${log.actor || log.username || log.user || ''}</td>
+                <td>${log.action || ''}</td>
+                <td>
+                    <span class="badge ${log.status === 'success' ? 'bg-success' : 'bg-danger'}">
+                        ${log.status}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick='showDetails(${JSON.stringify(log.details || {})})'>
+                        View Details
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('[ERROR] Error in loadLogs:', error);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-danger">
+                    Error loading logs: ${error.message}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function showDetails(details) {
+    const detailsHtml = Object.entries(details)
+        .map(([key, value]) => `<strong>${key}:</strong> ${JSON.stringify(value)}`)
+        .join('<br>');
+    
+    // Create modal element
+    const modalDiv = document.createElement('div');
+    modalDiv.className = 'modal fade';
+    modalDiv.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Log Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    ${detailsHtml || 'No additional details available'}
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modalDiv);
+    
+    const modal = new bootstrap.Modal(modalDiv);
+    modal.show();
+    
+    // Clean up after hiding
+    modalDiv.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modalDiv);
+    });
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatDate(dateStr) {
+    return new Date(dateStr).toLocaleString();
+}
+
+// Load stats when page loads
+document.addEventListener('DOMContentLoaded', loadLogStats);
+
+// Update the default date range to last hour instead of 24 hours
+document.addEventListener('DOMContentLoaded', () => {
+    const now = new Date();
+    const oneHourAgo = new Date(now - 60*60*1000);
+    
+    document.getElementById('endDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('startDate').value = oneHourAgo.toISOString().slice(0, 16);
+    
+    loadLogs();
+});
+
+// Add event listener for log type changes
+document.addEventListener('DOMContentLoaded', () => {
+    const logTypeSelect = document.getElementById('logType');
+    if (logTypeSelect) {
+        logTypeSelect.addEventListener('change', loadLogs);
+    }
+});
+
+// Add this function to handle SIEM status
+async function loadSiemStatus() {
+    const statusDiv = document.getElementById('siemStatus');
+    try {
+        const response = await fetch('/api/logs/siem/status');
+        if (!response.ok) {
+            throw new Error('Failed to load SIEM status');
+        }
+        
+        const data = await response.json();
+        
+        if (!data.configured) {
+            statusDiv.innerHTML = `
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No SIEM integration configured
+                </div>
+            `;
+        } else {
+            statusDiv.innerHTML = `
+                <div class="alert alert-success mb-0">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Connected to ${data.type}
+                    <div class="small mt-1">
+                        <strong>Last Sync:</strong> ${formatDate(data.last_sync)}
+                    </div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('[ERROR] Error loading SIEM status:', error);
+        statusDiv.innerHTML = `
+            <div class="alert alert-danger mb-0">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error loading SIEM status
+            </div>
+        `;
+    }
+}
+
+// Add this to your DOMContentLoaded event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    loadSiemStatus();
+});
+</script>
+{% endblock %} 
