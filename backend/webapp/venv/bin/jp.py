@@ -1,4 +1,4 @@
-#!/Users/darksider9/Documents/GitHub/reporter-tool/reporter-tool/webapp/venv/bin/python3
+#!/Users/darksider9/Documents/GitHub/reporter-tool/backend/webapp/venv/bin/python3.13
 
 import sys
 import json

@@ -1,4 +1,3 @@
-README.md
 setup.py
 reporter_tool.egg-info/PKG-INFO
 reporter_tool.egg-info/SOURCES.txt

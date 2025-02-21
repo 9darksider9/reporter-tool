@@ -7,23 +7,22 @@ cd "$(dirname "$0")"
 if [ -d "venv" ]; then
     source venv/bin/activate
 else
-    echo "Virtual environment not found. Please run setup_app.sh first."
+    echo "Virtual environment not found. Please set up the environment first."
     exit 1
 fi
 
-# Check and install required packages
+# Ensure necessary packages are installed
 echo "Checking required packages..."
 pip install flask-migrate flask-sqlalchemy
 
+# Create logs directory if it doesn't exist
+mkdir -p app/logs
+touch app/logs/audit.log app/logs/authentication.log app/logs/usage.log
+
 # Initialize migrations if not already initialized
-if [ ! -d "migrations" ]; then
-    echo "Initializing migrations..."
+if [ ! -f "migrations/alembic.ini" ]; then
+    echo "Migrations not initialized. Running flask db init..."
     flask db init
-    
-    if [ $? -ne 0 ]; then
-        echo "Error initializing migrations. Please check the error message above."
-        exit 1
-    fi
 fi
 
 echo "Starting database migration..."
@@ -51,4 +50,4 @@ echo "Migration completed successfully!"
 # Deactivate virtual environment
 deactivate
 
-echo "Done!" 
+echo "Done!"

@@ -11,8 +11,8 @@ bp = Blueprint('auth', __name__)
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
-    
+        return redirect(url_for('main.dashboard'))  # Fixed redirect
+
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
@@ -24,22 +24,23 @@ def login():
             )
             flash('Invalid username or password', 'danger')
             return redirect(url_for('auth.login'))
-        
+
         login_user(user)
         user.last_login = datetime.utcnow()
         db.session.commit()
-        
+
         current_app.audit_logger.log_auth(
             username=user.username,
             status='success',
             details={'user_id': user.id}
         )
-        
+
         next_page = request.args.get('next')
         if not next_page or url_parse(next_page).netloc != '':
-            next_page = url_for('main.index')
+            next_page = url_for('main.dashboard')  # Fixed redirect
+
         return redirect(next_page)
-    
+
     return render_template('auth/login.html', title='Sign In', form=form)
 
 @bp.route('/logout')
@@ -51,18 +52,19 @@ def logout():
             details={'action': 'logout'}
         )
     logout_user()
-    return redirect(url_for('main.index'))
+    return redirect(url_for('auth.login'))  # Redirecting to login after logout
 
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('main.dashboard'))
+        return redirect(url_for('main.dashboard'))  # Fixed redirect
+
     form = RegistrationForm()
     if form.validate_on_submit():
         user = User(
             username=form.username.data, 
             email=form.email.data,
-            role=UserRole.USER.value,  # Set default role to USER
+            roles=UserRole.USER.value,  # Set default role to USER
             is_active=True
         )
         user.set_password(form.password.data)
@@ -70,4 +72,5 @@ def register():
         db.session.commit()
         flash('Congratulations, you are now a registered user!')
         return redirect(url_for('auth.login'))
-    return render_template('auth/register.html', title='Register', form=form) 
+
+    return render_template('auth/register.html', title='Register', form=form)
