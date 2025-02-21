@@ -76,10 +76,10 @@ Run the Flask app using:
 ```bash
 ./run.sh
 ```
-The app should be available at `http://localhost:5000`
+The app should be available at `http://localhost:13500`
 
 ## **Logging in as Admin**
-1. Open `http://localhost:5000/login`
+1. Open `http://localhost:13500/login`
 2. Enter the following credentials:
    - **Username:** `admin`
    - **Password:** `admin`
@@ -110,7 +110,7 @@ If needed, reset the database:
 ```
 
 4. **Login as Admin and Verify UI is Working:**
-Go to `http://localhost:5000/login` and sign in with `admin` credentials.
+Go to `http://localhost:13500/login` and sign in with `admin` credentials.
 
 ## **How to Provide Code for Further Development**
 To ensure continuity when prompting me for code modifications, follow these steps:
@@ -138,3 +138,4 @@ To ensure continuity when prompting me for code modifications, follow these step
      ```
 
 By following these steps, we can efficiently iterate and build upon what we’ve already created. 🚀
+
